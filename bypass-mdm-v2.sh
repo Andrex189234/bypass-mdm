@@ -111,67 +111,26 @@ find_available_uid() {
 }
 
 # Function to detect system volumes with multiple fallback strategies
-detect_volumes() {
-	local system_vol=""
-	local data_vol=""
+# Force system volume name
+system_volume="macOS"
 
-	info "Detecting system volumes..." >&2
+# Detect Data volume
+info "Using fixed system volume name: macOS"
 
-	# Strategy 1: Look for common macOS APFS volume patterns
-	# List all volumes and look for system volume (ends with or contains common names)
-	for vol in /Volumes/*; do
-		if [ -d "$vol" ]; then
-			vol_name=$(basename "$vol")
+if [ -d "/Volumes/Data" ]; then
+	data_volume="Data"
+	info "Found data volume: Data"
+elif [ -d "/Volumes/macOS - Data" ]; then
+	data_volume="macOS - Data"
+	info "Found data volume: macOS - Data"
+else
+	error_exit "Could not detect Data volume. Expected 'Data' or 'macOS - Data'"
+fi
 
-			# Check if this looks like a system volume (not Data, not recovery)
-			if [[ ! "$vol_name" =~ "Data"$ ]] && [[ ! "$vol_name" =~ "Recovery" ]] && [ -d "$vol/System" ]; then
-				system_vol="$vol_name"
-				info "Found system volume: $system_vol" >&2
-				break
-			fi
-		fi
-	done
-
-	# Strategy 2: If no system volume found, try looking for any volume with /System directory
-	if [ -z "$system_vol" ]; then
-		for vol in /Volumes/*; do
-			if [ -d "$vol/System" ]; then
-				system_vol=$(basename "$vol")
-				warn "Using volume with /System directory: $system_vol" >&2
-				break
-			fi
-		done
-	fi
-
-	# Strategy 3: Check for Data volume
-	if [ -d "/Volumes/Data" ]; then
-		data_vol="Data"
-		info "Found data volume: $data_vol" >&2
-	elif [ -n "$system_vol" ] && [ -d "/Volumes/$system_vol - Data" ]; then
-		data_vol="$system_vol - Data"
-		info "Found data volume: $data_vol" >&2
-	else
-		# Look for any volume ending with "Data"
-		for vol in /Volumes/*Data; do
-			if [ -d "$vol" ]; then
-				data_vol=$(basename "$vol")
-				warn "Found data volume: $data_vol" >&2
-				break
-			fi
-		done
-	fi
-
-	# Validate findings
-	if [ -z "$system_vol" ]; then
-		error_exit "Could not detect system volume. Please ensure you're running this in Recovery mode with a macOS installation present."
-	fi
-
-	if [ -z "$data_vol" ]; then
-		error_exit "Could not detect data volume. Please ensure you're running this in Recovery mode with a macOS installation present."
-	fi
-
-	echo "$system_vol|$data_vol"
-}
+# Validate system volume
+if [ ! -d "/Volumes/$system_volume" ]; then
+	error_exit "System volume '/Volumes/macOS' not found. Make sure the volume is named exactly 'macOS'"
+fi
 
 # Detect volumes at startup
 volume_info=$(detect_volumes)
