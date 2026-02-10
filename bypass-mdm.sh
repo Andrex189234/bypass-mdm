@@ -18,7 +18,7 @@ if [ ! -d "/Volumes/$SYSTEM_VOL" ]; then
 fi
 
 if [ -d "/Volumes/macOS - Data" ]; then
-	diskutil rename "macOS - Data" "Data" 2>/dev/null
+	diskutil rename "macOS - Dati" "Dati" 2>/dev/null
 fi
 
 if [ ! -d "/Volumes/$DATA_VOL" ]; then
@@ -27,7 +27,7 @@ if [ ! -d "/Volumes/$DATA_VOL" ]; then
 fi
 
 # Display header
-echo -e "${CYAN}Bypass MDM By Assaf Dori (assafdori.com)${NC}"
+echo -e "${CYAN}Bypass MDM By Assaf Dori (assafdori.com) fixed${NC}"
 echo ""
 
 # Prompt user for choice
