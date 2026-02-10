@@ -112,20 +112,24 @@ find_available_uid() {
 
 # Function to detect system volumes with multiple fallback strategies
 # Force system volume name
+
+# Force volume names
 system_volume="macOS"
+data_volume="Dati"
 
-# Detect Data volume
 info "Using fixed system volume name: macOS"
+info "Using fixed data volume name: Dati"
 
-if [ -d "/Volumes/Data" ]; then
-	data_volume="Data"
-	info "Found data volume: Data"
-elif [ -d "/Volumes/macOS - Data" ]; then
-	data_volume="macOS - Data"
-	info "Found data volume: macOS - Data"
-else
-	error_exit "Could not detect Data volume. Expected 'Data' or 'macOS - Data'"
+# Validate system volume
+if [ ! -d "/Volumes/$system_volume" ]; then
+	error_exit "System volume '/Volumes/$system_volume' not found. Make sure it is named exactly 'macOS'"
 fi
+
+# Validate data volume
+if [ ! -d "/Volumes/$data_volume" ]; then
+	error_exit "Data volume '/Volumes/$data_volume' not found. Make sure it is named exactly 'Dati'"
+fi
+
 
 # Validate system volume
 if [ ! -d "/Volumes/$system_volume" ]; then
@@ -164,7 +168,7 @@ select opt in "${options[@]}"; do
 			info "Renaming data volume to 'Data' for consistency..."
 			if diskutil rename "$data_volume" "Data" 2>/dev/null; then
 				success "Data volume renamed successfully"
-				data_volume="Data"
+				data_volume="Dati"
 			else
 				warn "Could not rename data volume, continuing with: $data_volume"
 			fi
