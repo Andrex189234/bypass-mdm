@@ -1,4 +1,8 @@
-# Define color codes
+#!/bin/bash
+
+# =========================
+# Color codes
+# =========================
 RED='\033[1;31m'
 GRN='\033[1;32m'
 BLU='\033[1;34m'
@@ -7,75 +11,110 @@ PUR='\033[1;35m'
 CYAN='\033[1;36m'
 NC='\033[0m'
 
+# =========================
 # Fixed volume names
+# =========================
 SYSTEM_VOL="macOS"
-DATA_VOL="Data"
+DATA_VOL="macOS - Dati"
 
+# =========================
 # Validate volumes
+# =========================
 if [ ! -d "/Volumes/$SYSTEM_VOL" ]; then
 	echo -e "${RED}ERROR: System volume '/Volumes/$SYSTEM_VOL' not found${NC}"
 	exit 1
 fi
 
-if [ -d "/Volumes/macOS - Data" ]; then
-	diskutil rename "macOS - Dati" "Dati" 2>/dev/null
-fi
-
 if [ ! -d "/Volumes/$DATA_VOL" ]; then
-	echo -e "${RED}ERROR: Data volume not found${NC}"
+	echo -e "${RED}ERROR: Data volume '/Volumes/$DATA_VOL' not found${NC}"
 	exit 1
 fi
 
-# Display header
-echo -e "${CYAN}Bypass MDM By Assaf Dori (assafdori.com) fixed${NC}"
+SYSTEM_PATH="/Volumes/$SYSTEM_VOL"
+DATA_PATH="/Volumes/$DATA_VOL"
+DSCL_PATH="$DATA_PATH/private/var/db/dslocal/nodes/Default"
+
+if [ ! -d "$DSCL_PATH" ]; then
+	echo -e "${RED}ERROR: Directory Services path not found${NC}"
+	exit 1
+fi
+
+# =========================
+# Header
+# =========================
+echo ""
+echo -e "${CYAN}╔═══════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║  Bypass MDM By Assaf Dori (assafdori.com)   ║${NC}"
+echo -e "${CYAN}╚═══════════════════════════════════════════════╝${NC}"
+echo ""
+echo -e "${GRN}System Volume:${NC} $SYSTEM_VOL"
+echo -e "${GRN}Data Volume:${NC}   $DATA_VOL"
 echo ""
 
-# Prompt user for choice
+# =========================
+# Menu
+# =========================
 PS3='Please enter your choice: '
 options=("Bypass MDM from Recovery" "Reboot & Exit")
+
 select opt in "${options[@]}"; do
 	case $opt in
 
 	"Bypass MDM from Recovery")
+		echo ""
 		echo -e "${YEL}Bypass MDM from Recovery${NC}"
+		echo ""
 
-		# Create Temporary User
-		echo -e "${NC}Create a Temporary User${NC}"
-		read -p "Enter Temporary Fullname (Default is 'Apple'): " realName
+		# -------------------------
+		# Temporary user creation
+		# -------------------------
+		read -p "Enter Temporary Fullname (Default: Apple): " realName
 		realName="${realName:=Apple}"
-		read -p "Enter Temporary Username (Default is 'Apple'): " username
+
+		read -p "Enter Temporary Username (Default: Apple): " username
 		username="${username:=Apple}"
-		read -p "Enter Temporary Password (Default is '1234'): " passw
+
+		read -p "Enter Temporary Password (Default: 1234): " passw
 		passw="${passw:=1234}"
 
-		# Create User
-		dscl_path="/Volumes/$DATA_VOL/private/var/db/dslocal/nodes/Default"
+		echo ""
 		echo -e "${GRN}Creating Temporary User${NC}"
 
-		dscl -f "$dscl_path" localhost -create "/Local/Default/Users/$username"
-		dscl -f "$dscl_path" localhost -create "/Local/Default/Users/$username" UserShell "/bin/zsh"
-		dscl -f "$dscl_path" localhost -create "/Local/Default/Users/$username" RealName "$realName"
-		dscl -f "$dscl_path" localhost -create "/Local/Default/Users/$username" UniqueID "501"
-		dscl -f "$dscl_path" localhost -create "/Local/Default/Users/$username" PrimaryGroupID "20"
-		mkdir -p "/Volumes/$DATA_VOL/Users/$username"
-		dscl -f "$dscl_path" localhost -create "/Local/Default/Users/$username" NFSHomeDirectory "/Users/$username"
-		dscl -f "$dscl_path" localhost -passwd "/Local/Default/Users/$username" "$passw"
-		dscl -f "$dscl_path" localhost -append "/Local/Default/Groups/admin" GroupMembership "$username"
+		dscl -f "$DSCL_PATH" localhost -create "/Local/Default/Users/$username"
+		dscl -f "$DSCL_PATH" localhost -create "/Local/Default/Users/$username" UserShell "/bin/zsh"
+		dscl -f "$DSCL_PATH" localhost -create "/Local/Default/Users/$username" RealName "$realName"
+		dscl -f "$DSCL_PATH" localhost -create "/Local/Default/Users/$username" UniqueID "501"
+		dscl -f "$DSCL_PATH" localhost -create "/Local/Default/Users/$username" PrimaryGroupID "20"
 
+		mkdir -p "$DATA_PATH/Users/$username"
+		dscl -f "$DSCL_PATH" localhost -create "/Local/Default/Users/$username" NFSHomeDirectory "/Users/$username"
+		dscl -f "$DSCL_PATH" localhost -passwd "/Local/Default/Users/$username" "$passw"
+		dscl -f "$DSCL_PATH" localhost -append "/Local/Default/Groups/admin" GroupMembership "$username"
+
+		echo -e "${GRN}Temporary user created successfully${NC}"
+		echo ""
+
+		# -------------------------
 		# Block MDM domains
-		HOSTS="/Volumes/$SYSTEM_VOL/etc/hosts"
+		# -------------------------
+		echo -e "${BLU}Blocking MDM domains...${NC}"
+
+		HOSTS="$SYSTEM_PATH/etc/hosts"
 		touch "$HOSTS"
 
-		grep -q deviceenrollment.apple.com "$HOSTS" || echo "0.0.0.0 deviceenrollment.apple.com" >>"$HOSTS"
-		grep -q mdmenrollment.apple.com "$HOSTS" || echo "0.0.0.0 mdmenrollment.apple.com" >>"$HOSTS"
-		grep -q iprofiles.apple.com "$HOSTS" || echo "0.0.0.0 iprofiles.apple.com" >>"$HOSTS"
+		for domain in deviceenrollment.apple.com mdmenrollment.apple.com iprofiles.apple.com; do
+			grep -q "$domain" "$HOSTS" || echo "0.0.0.0 $domain" >>"$HOSTS"
+		done
 
 		echo -e "${GRN}Successfully blocked MDM & Profile Domains${NC}"
+		echo ""
 
-		# Remove configuration profiles
-		touch "/Volumes/$DATA_VOL/private/var/db/.AppleSetupDone"
+		# -------------------------
+		# Configuration Profiles
+		# -------------------------
+		touch "$DATA_PATH/private/var/db/.AppleSetupDone"
 
-		CFG="/Volumes/$SYSTEM_VOL/var/db/ConfigurationProfiles/Settings"
+		CFG="$SYSTEM_PATH/var/db/ConfigurationProfiles/Settings"
 		mkdir -p "$CFG"
 
 		rm -rf "$CFG/.cloudConfigHasActivationRecord"
@@ -84,19 +123,22 @@ select opt in "${options[@]}"; do
 		touch "$CFG/.cloudConfigRecordNotFound"
 
 		echo -e "${GRN}MDM enrollment has been bypassed!${NC}"
-		echo -e "${NC}Exit terminal and reboot your Mac.${NC}"
+		echo ""
+		echo -e "${YEL}Login after reboot with:${NC}"
+		echo -e "User: ${PUR}$username${NC}"
+		echo -e "Pass: ${PUR}$passw${NC}"
+		echo ""
 		break
 		;;
 
 	"Reboot & Exit")
-		echo "Rebooting..."
+		echo -e "${BLU}Rebooting...${NC}"
 		reboot
 		break
 		;;
 
 	*)
-		echo "Invalid option $REPLY"
+		echo -e "${RED}Invalid option${NC}"
 		;;
 	esac
 done
-
